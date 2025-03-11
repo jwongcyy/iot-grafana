@@ -1,0 +1,20 @@
+LED Specifications:
+
+1. Deep Red (660 nm): Efficiency = 2.5 µmol/J
+2. Dual-Peak Blue (430 + 480 nm): Efficiency = 1.8 µmol/J
+3. Blue (450 nm): Efficiency = 2.0 µmol/J
+4. Cool White (450 + 550 nm): Efficiency = 1.5 µmol/J
+(Efficiencies based on mid-range LEDs)
+
+Power per LED: 0.5W (to reach 10W total with 20 LEDs).
+
+Photon Flux (µmol/s) per LED:
+1. Deep Red: 2.5 µmol/J × 0.5 W = 1.25 µmol/s
+2. Dual-Peak Blue: 1.8 µmol/J × 0.5 W = 0.9 µmol/s
+3. Blue (450 nm): 2.0 µmol/J × 0.5 W = 1.0 µmol/s
+4. Cool White: 1.5 µmol/J × 0.5 W = 0.75 µmol/s
+
+
+SPD (W/m2)
+Energy to Photons
+E = hc / lamda
