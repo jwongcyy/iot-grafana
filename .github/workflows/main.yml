@@ -1,0 +1,35 @@
+name: edenic csv
+
+on:
+  workflow_dispatch:
+    inputs:
+      description: 'edenic data'
+      
+jobs:
+  process-data:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        
+    - name: Run edenic.py
+      run: |
+        python edenic.py
+        
+    - name: Commit processed files
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add *.csv
+        git commit -m "Auto-commit processed data files" || echo "No changes to commit"
+        git push
