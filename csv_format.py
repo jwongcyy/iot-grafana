@@ -4,7 +4,7 @@ import pandas as pd
 df = pd.read_csv('export.csv')
 
 # Rename the columns
-df.columns = ['date', 'pH', 'Temperature', 'EC']
+df.columns = ['', 'pH', 'Temperature', 'EC']
 
 # Save the modified full CSV
 df.to_csv('export_mod.csv', index=False)
@@ -17,5 +17,5 @@ split_files = {
 }
 
 for col, filename in split_files.items():
-    split_df = df[['date', col]]
+    split_df = df[['', col]]
     split_df.to_csv(filename, index=False)
