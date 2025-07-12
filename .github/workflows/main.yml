@@ -24,7 +24,7 @@ jobs:
         
     - name: Run edenic.py
       run: |
-        python edenic.py
+        python csv_format.py
         
     - name: Commit processed files
       run: |
