@@ -2,8 +2,8 @@ name: edenic csv
 
 on:
   workflow_dispatch:
-    inputs:
-      description: 'edenic data'
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
       
 jobs:
   process-data:
