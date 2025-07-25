@@ -7,7 +7,7 @@ import schedule
 import math
 
 # ===== CUSTOMIZABLE PARAMETERS =====
-FEEDING_TIMES = ["08:00", "16:00"]  # AM/PM feeding schedule
+FEEDING_TIMES = ["05:00", "20:00"]  # AM/PM feeding schedule
 MONITOR_INTERVAL = 180  # minutes between checks
 BASE_FEED_DURATION = 5  # seconds (median feeding time)
 PUMP_PIN = 18  # GPIO pin
