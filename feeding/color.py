@@ -7,7 +7,7 @@ import RPi.GPIO as GPIO  # For Raspberry Pi (comment out if using Arduino)
 # Configuration
 LOWER_GREEN = (30, 50, 50)    # HSV lower bound for algae
 UPPER_GREEN = (90, 255, 255)  # HSV upper bound
-DISPENSE_TIMES = ["09:00", "17:00"]  # AM/PM dispensing schedule
+DISPENSE_TIMES = ["04:00", "22:00"]  # AM/PM dispensing schedule
 PUMP_PIN = 18                  # GPIO pin for pump control
 LOG_FILE = "algae_log.csv"
 
