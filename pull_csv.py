@@ -11,7 +11,7 @@ if not API_KEY or not API_URL:
     raise ValueError("Missing required tokens in environment variables.")
 
 headers = {
-    "Authorization": f"Token {API_KEY}"
+    "Authorization": API_KEY
 }
 
 def get_timestamps_past_7_days():
