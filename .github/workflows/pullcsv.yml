@@ -1,0 +1,38 @@
+name: pull edenic to csv
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+
+permissions:
+  contents: write
+      
+jobs:
+  process-data:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas
+        
+    - name: Run script
+      run: |
+        python pull_csv.py
+        
+    - name: Commit processed files
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add *.csv
+        git commit -m "Auto-commit processed data files" || echo "No changes to commit"
+        git push
