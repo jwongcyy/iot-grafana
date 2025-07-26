@@ -6,8 +6,11 @@ import time
 API_KEY = os.environ.get('API_KEY')
 API_URL = os.environ.get('API_URL')
 
+if not API_KEY or not API_URL:
+    raise ValueError("Missing required tokens in environment variables.")
+
 headers = {
-    "Authorization": API_KEY
+    "Authorization": f"Token {API_KEY}"
 }
 
 def get_timestamps_past_7_days():
@@ -29,7 +32,7 @@ def fetch_telemetry():
         "orderBy": "ASC"
     }
     
-    response = requests.get(API_URL, headers=headers, params=params)
+    response = requests.get(f"Token {API_URL}", headers=headers, params=params)
     if response.status_code == 200:
         print("Response received:")
         print(response.text)
