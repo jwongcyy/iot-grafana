@@ -11,6 +11,7 @@ permissions:
 jobs:
   process-data:
     runs-on: ubuntu-latest
+    environment: edenic
 
     steps:
     - uses: actions/checkout@v4
@@ -23,9 +24,12 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pandas
+        pip install pandas 
         
     - name: Run script
+      env:
+        API_URL: ${{ secrets.API_URL }}
+        API_KEY: ${{ secrets.API_KEY }}
       run: |
         python pull_csv.py
         
