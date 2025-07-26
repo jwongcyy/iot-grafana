@@ -44,54 +44,26 @@ def fetch_telemetry():
         return None
 
 def transform_and_export_csv(data):
-    """
-    Transform the JSON data into a DataFrame and export separate CSV files for
-    temperature, pH, and electrical conductivity.
-    Assumes data["results"] is a list of telemetry records with keys including
-    'timestamp', 'temperature', 'ph', 'electrical_conductivity'.
-    """
-
-    if not data or 'results' not in data or not data['results']:
-        print("No data to process")
+    if not data:
+        print("No data to process.")
         return
-
-    # Create DataFrame from results
-    df = pd.DataFrame(data['results'])
-
-    # Convert timestamp from milliseconds epoch to human-readable or keep timestamp as string
-    # Example: convert ms to ISO date string (optional, or keep as-is)
-    # df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-
-    # Rename columns to match your CSV format, including a blank first column for timestamp
-    # Here we'll make the first column empty string to match your provided example
-    df.rename(columns={
-        'timestamp': '',
-        'ph': 'pH',
-        'temperature': 'Temperature',
-        'electrical_conductivity': 'EC'
-    }, inplace=True)
-
-    # Reorder columns to have the unnamed time column first (empty string), then pH, Temperature, EC
-    # If any columns missing, ignore to avoid errors
-    cols_to_keep = [col for col in ['', 'pH', 'Temperature', 'EC'] if col in df.columns]
-    df = df[cols_to_keep]
-
-    # Save the modified full CSV (optional)
-    df.to_csv('export_mod.csv', index=False)
-
-    # Prepare dictionary for split-export filenames
-    split_files = {
-        'pH': 'edenic1_ph.csv',
-        'Temperature': 'edenic1_temp.csv',
-        'EC': 'edenic1_ec.csv'
-    }
-
-    # Export the three CSV files: each has timestamp and one measurement column
-    for col, filename in split_files.items():
-        if col in df.columns:
-            split_df = df[['', col]]
-            split_df.to_csv(filename, index=False)
-            print(f"Exported {filename}")
+    
+    for param_name, param_data in data.items():
+        df = pd.DataFrame(param_data)
+        df['ts'] = pd.to_datetime(df['ts'], unit='ms')
+        df['value'] = df['value'].astype(float)
+        
+        df = df.rename(columns={
+            'ts': '',
+            'value': param_name
+            })
+        
+        filename = f"edenic_{param_name}.csv"
+        df.to_csv(filename, index=False)
+        print(f"Exported {filename} with {len(df)} records")
+        
+        print(f"\nSample of {filename}:")
+        print(df.head(2), "\n" + "-"*50 + "\n")
 
 if __name__ == "__main__":
     data = fetch_telemetry()
