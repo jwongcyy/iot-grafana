@@ -32,7 +32,7 @@ def fetch_telemetry():
         "orderBy": "ASC"
     }
     
-    response = requests.get(f"Token {API_URL}", headers=headers, params=params)
+    response = requests.get(API_URL, headers=headers, params=params)
     if response.status_code == 200:
         print("Response received:")
         print(response.text)
