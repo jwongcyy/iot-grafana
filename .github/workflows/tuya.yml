@@ -2,8 +2,7 @@ name: Tuya 5in1_temperature
 
 on:
   schedule:
-    # Run every hour at minute 20
-    - cron: '20 * * * *'
+    - cron: '20 * * * *' # Run every hour at minute 20
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -26,9 +25,18 @@ jobs:
 
     - name: Configure environment variables
       run: |
-        cat > .env 
+        cat > .env << EOF
+        TUYA_ACCESS_ID=${{ secrets.TUYA_ACCESS_ID }}
+        TUYA_ACCESS_SECRET=${{ secrets.TUYA_ACCESS_SECRET }}
+        TUYA_DEVICE_ID=${{ secrets.TUYA_DEVICE_ID }}
+        REGION=${{ secrets.REGION }}
+        INFLUXDB_URL=${{ secrets.INFLUXDB_URL }}
+        INFLUXDB_TOKEN=${{ secrets.INFLUXDB_TOKEN }}
+        INFLUXDB_ORG=${{ secrets.INFLUXDB_ORG }}
+        INFLUXDB_BUCKET=${{ secrets.INFLUXDB_BUCKET }}
+        EOF
 
-    - name: Run temperature logger
+    - name: Run script
       run: python tuya_influx.py
 
     - name: Clean up
