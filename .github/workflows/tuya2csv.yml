@@ -34,17 +34,14 @@ jobs:
         TUYA_BASE_URL=${{ secrets.TUYA_BASE_URL }}
         EOF
   
-    - name: Run script
-      run: python tuya/tuya_csv.py
-        
     - name: Run script with append mode
-      run: python tuya/tuya_csv.py --append
+      run: python tuya/tuya_csv.py --append --output tuya/device.csv
         
     - name: Commit processed files
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git add *.csv
+        git add tuya/device.csv
         git commit -m "Auto-commit processed data files" || echo "No changes to commit"
         git push
 
