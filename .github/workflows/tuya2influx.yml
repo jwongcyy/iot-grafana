@@ -1,4 +1,4 @@
-name: Tuya 5in1_temperature
+name: tuya temp to influxdb
 
 on:
   schedule:
