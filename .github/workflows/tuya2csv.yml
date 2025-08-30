@@ -11,7 +11,6 @@ permissions:
 jobs:
   process-data:
     runs-on: ubuntu-latest
-    environment: edenic
 
     steps:
     - uses: actions/checkout@v4
@@ -25,15 +24,21 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r tuya/requirements.txt
-        
-    - name: Run script
-      env:
-        TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
-        TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
-        TUYA_DEVICE_ID: ${{ secrets.TUYA_DEVICE_ID }}
-        TUYA_BASE_URL: ${{ secrets.TUYA_BASE_URL }}
+
+    - name: Configure environment variables
       run: |
-        python tuya/tuya_csv.py
+        cat > .env << EOF
+        TUYA_ACCESS_ID=${{ secrets.TUYA_ACCESS_ID }}
+        TUYA_ACCESS_SECRET=${{ secrets.TUYA_ACCESS_SECRET }}
+        TUYA_DEVICE_ID=${{ secrets.TUYA_DEVICE_ID }}
+        TUYA_BASE_URL=${{ secrets.TUYA_BASE_URL }}
+        EOF
+  
+    - name: Run script
+      run: python tuya/tuya_csv.py
+        
+    - name: Run script with append mode
+      run: python tuya/tuya_csv.py --append
         
     - name: Commit processed files
       run: |
@@ -42,3 +47,6 @@ jobs:
         git add *.csv
         git commit -m "Auto-commit processed data files" || echo "No changes to commit"
         git push
+
+    - name: Clean up
+      run: rm -f .env
