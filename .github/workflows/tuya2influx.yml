@@ -1,4 +1,4 @@
-name: tuya temp to influxdb
+name: pull tuya hourly to influxdb
 
 on:
   schedule:
