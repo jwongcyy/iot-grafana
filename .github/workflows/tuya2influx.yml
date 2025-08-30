@@ -21,11 +21,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r tuya/requirements.txt
 
     - name: Configure environment variables
       run: |
-        cat > .env << EOF
+        cat > tuya/.env << EOF
         TUYA_ACCESS_ID=${{ secrets.TUYA_ACCESS_ID }}
         TUYA_ACCESS_SECRET=${{ secrets.TUYA_ACCESS_SECRET }}
         TUYA_DEVICE_ID=${{ secrets.TUYA_DEVICE_ID }}
@@ -37,7 +37,7 @@ jobs:
         EOF
 
     - name: Run script
-      run: python tuya_influx.py
+      run: python tuya/tuya_influx.py
 
     - name: Clean up
       run: rm -f .env
