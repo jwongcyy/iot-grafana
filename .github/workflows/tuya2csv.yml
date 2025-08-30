@@ -35,7 +35,7 @@ jobs:
         EOF
   
     - name: Run script with append mode
-      run: python tuya/tuya_csv.py --append --output tuya/device.csv
+      run: python tuya/tuya_csv.py --append --output tuya/device.csv --timezone +8
         
     - name: Commit processed files
       run: |
