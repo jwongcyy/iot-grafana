@@ -270,7 +270,7 @@ class TuyaCloudAPI:
             
             # Extract temperature data and append to CSV
             if result.get('success') and result.get('result'):
-                current_time = datetime.now().strftime('%Y/%m/%d %H:%M')
+                current_time = datetime.now(timezone(timedelta(hours=8))).strftime('%Y/%m/%d %H:%M')
                 
                 # Look for temperature in the status data
                 for status_item in result['result']:
