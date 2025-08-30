@@ -25,13 +25,14 @@ jobs:
 
     - name: Configure environment variables
       run: |
-        cat > tuya/.env << EOF
+        cat > .env << EOF
         TUYA_ACCESS_ID=${{ secrets.TUYA_ACCESS_ID }}
         TUYA_ACCESS_SECRET=${{ secrets.TUYA_ACCESS_SECRET }}
         TUYA_DEVICE_ID=${{ secrets.TUYA_DEVICE_ID }}
-        REGION=${{ secrets.REGION }}
+        TUYA_BASE_URL=${{ secrets.TUYA_BASE_URL }}
         INFLUXDB_URL=${{ secrets.INFLUXDB_URL }}
         INFLUXDB_TOKEN=${{ secrets.INFLUXDB_TOKEN }}
+        INFLUXDB_USER=${{ secrets.INFLUXDB_USER }}
         INFLUXDB_ORG=${{ secrets.INFLUXDB_ORG }}
         INFLUXDB_BUCKET=${{ secrets.INFLUXDB_BUCKET }}
         EOF
