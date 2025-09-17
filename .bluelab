@@ -1,3 +1,21 @@
+# Bluelab Guardian - bash
+
+## get device id
+curl --include https://api.edenic.io/api/v1/device/5efd82d0-4d20-11f0-9521-8dff4b34f2dc \
+  --header 'Authorization: ed_1kw70wywwsb511fw54mb5iwozhdxgoj2bv0jglw99grc5sv3lhi93k1ae45cz0c4'
+
+## get data
+curl --include --get https://api.edenic.io/api/v1/telemetry/3ce4e580-8f8d-11f0-97a6-b92fd0a6fe82 \
+  --header 'Authorization: ed_1kw70wywwsb511fw54mb5iwozhdxgoj2bv0jglw99grc5sv3lhi93k1ae45cz0c4' \
+  --data 'keys=temperature,electrical_conductivity,ph' \
+  --data 'startTs=1726318800000' \
+  --data 'endTs=1726322400000' \
+  --data 'interval=10800000' \
+  --data 'agg=AVG' \
+  --data 'orderBy=ASC'
+
+
+
 # Bluelab Pro Controller - bash
 
 ## get device id
