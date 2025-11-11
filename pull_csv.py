@@ -3,6 +3,7 @@ import requests
 import time
 import pandas as pd
 import json
+from datetime import datetime
 
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
