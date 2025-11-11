@@ -1,8 +1,8 @@
-name: Edenic Telemetry Export
+name: sh pull edenic to csv
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
   workflow_dispatch:
 
 jobs:
