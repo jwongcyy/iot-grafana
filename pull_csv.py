@@ -34,7 +34,7 @@ def fetch_telemetry():
     start_ts, end_ts = get_timestamps_past_7_days()
     
     params = {
-        "keys": "temperature,electrical_conductivity,ph",
+        "keys": "ph,temperature,electrical_conductivity",
         "startTs": str(start_ts),
         "endTs": str(end_ts),
         "interval": "10800000",  # 3-hour interval
