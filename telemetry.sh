@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Read secrets from .secrets file
-echo "🔍 Loading secrets from .secrets file..."
-if [ -f .secrets ]; then
-    source .secrets
+echo "🔍 Loading secrets from .env file..."
+if [ -f .env ]; then
+    source .env
     echo "✅ Secrets loaded successfully"
 else
-    echo "❌ .secrets file not found"
+    echo "❌ .env file not found"
     exit 1
 fi
 
