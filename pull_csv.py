@@ -2,6 +2,7 @@ import os
 import requests
 import time
 import pandas as pd
+from pathlib import Path
 
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
@@ -33,14 +34,14 @@ def fetch_telemetry():
         "orderBy": "ASC"
     }
     
-    response = requests.get(API_URL, headers=headers, params=params)
-    if response.status_code == 200:
+    try:
+        response = requests.get(API_URL, headers=headers, params=params, timeout=30)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
         print("Response received from Edenic API")
         data = response.json()
         return data
-    else:
-        print(f"Failed to fetch telemetry data: HTTP {response.status_code}")
-        print(response.text)
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch telemetry data: {e}")
         return None
 
 def transform_and_export_csv(data):
@@ -48,24 +49,49 @@ def transform_and_export_csv(data):
         print("No data to process.")
         return
     
+    # Create output directory if it doesn't exist
+    output_dir = Path("telemetry_data")
+    output_dir.mkdir(exist_ok=True)
+    
+    exported_files = []
+    
     for param_name, param_data in data.items():
+        if not param_data:
+            print(f"No data available for {param_name}")
+            continue
+            
         df = pd.DataFrame(param_data)
         df['ts'] = pd.to_datetime(df['ts'], unit='ms')
-        df['value'] = df['value'].astype(float)
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
         
         df = df.rename(columns={
-            'ts': '',
+            'ts': 'timestamp',
             'value': param_name
-            })
+        })
         
-        filename = f"edenic_{param_name}.csv"
-        df.to_csv(filename, index=False)
-        print(f"Exported {filename} with {len(df)} records")
+        filename = output_dir / f"edenic_{param_name}.csv"
         
-        print(f"\nSample of {filename}:")
-        print(df.head(2), "\n" + "-"*50 + "\n")
+        try:
+            df.to_csv(filename, index=False)
+            print(f"Exported {filename} with {len(df)} records")
+            exported_files.append(filename)
+            
+            print(f"\nSample of {filename}:")
+            print(df.head(2))
+            print("-" * 50 + "\n")
+            
+        except Exception as e:
+            print(f"Error exporting {filename}: {e}")
+    
+    return exported_files
 
 if __name__ == "__main__":
     data = fetch_telemetry()
     if data:
-        transform_and_export_csv(data)
+        exported_files = transform_and_export_csv(data)
+        if exported_files:
+            print(f"Successfully exported {len(exported_files)} files:")
+            for file in exported_files:
+                print(f"  - {file}")
+        else:
+            print("No files were exported.")
