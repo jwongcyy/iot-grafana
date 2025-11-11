@@ -2,7 +2,6 @@ import os
 import requests
 import time
 import pandas as pd
-import json
 from datetime import datetime, timedelta
 
 # read secrets from environment
@@ -23,156 +22,180 @@ def get_timestamps_past_7_days():
     start_ts = end_ts - (7 * 24 * 60 * 60 * 1000)
     return start_ts, end_ts
 
-def debug_api_call():
-    """Make test API calls to understand the issue"""
-    start_ts, end_ts = get_timestamps_past_7_days()
+def get_recent_timestamps():
+    """Get timestamps for recent data - using a wider range to ensure we get data"""
+    # Current time (end timestamp) in milliseconds
+    end_ts = int(time.time() * 1000)
+    # Start timestamp = 30 days ago in milliseconds to ensure we get data
+    start_ts = end_ts - (30 * 24 * 60 * 60 * 1000)
+    return start_ts, end_ts
+
+def fetch_telemetry():
+    start_ts, end_ts = get_recent_timestamps()
     
     # Convert to readable dates for debugging
     start_dt = datetime.fromtimestamp(start_ts/1000)
     end_dt = datetime.fromtimestamp(end_ts/1000)
-    print(f"Time range: {start_dt} to {end_dt}")
+    print(f"Fetching data from {start_dt} to {end_dt}")
     
-    # Test different parameter combinations
-    test_cases = [
-        {
-            "name": "Original parameters",
-            "params": {
-                "keys": "temperature,electrical_conductivity,ph",
-                "startTs": str(start_ts),
-                "endTs": str(end_ts),
-                "interval": "10800000",  # 3-hour interval
-                "agg": "AVG",
-                "orderBy": "ASC"
-            }
-        },
-        {
-            "name": "Single parameter - temperature",
-            "params": {
-                "keys": "temperature",
-                "startTs": str(start_ts),
-                "endTs": str(end_ts),
-                "interval": "10800000",
-                "agg": "AVG",
-                "orderBy": "ASC"
-            }
-        },
-        {
-            "name": "No aggregation",
-            "params": {
-                "keys": "temperature",
-                "startTs": str(start_ts),
-                "endTs": str(end_ts),
-                "orderBy": "ASC"
-            }
-        },
-        {
-            "name": "Different time range (last 24 hours)",
-            "params": {
-                "keys": "temperature",
-                "startTs": str(end_ts - (24 * 60 * 60 * 1000)),  # 24 hours ago
-                "endTs": str(end_ts),
-                "interval": "3600000",  # 1-hour interval
-                "agg": "AVG",
-                "orderBy": "ASC"
-            }
-        }
-    ]
+    params = {
+        "keys": "temperature,electrical_conductivity,ph",
+        "startTs": str(start_ts),
+        "endTs": str(end_ts),
+        "interval": "10800000",  # 3-hour interval
+        "agg": "AVG",
+        "orderBy": "ASC"
+    }
     
-    for i, test_case in enumerate(test_cases):
-        print(f"\n{'='*60}")
-        print(f"TEST CASE {i+1}: {test_case['name']}")
-        print(f"{'='*60}")
+    response = requests.get(API_URL, headers=headers, params=params)
+    if response.status_code == 200:
+        print("✅ Response received from Edenic API")
+        data = response.json()
+        print(f"📊 Data structure: {list(data.keys())}")
+        
+        # Print data summary
+        for param, values in data.items():
+            print(f"   {param}: {len(values)} data points")
+            if values:
+                # Convert timestamp to readable date
+                first_ts = values[0]['ts']
+                first_dt = datetime.fromtimestamp(first_ts/1000)
+                last_ts = values[-1]['ts'] if len(values) > 1 else first_ts
+                last_dt = datetime.fromtimestamp(last_ts/1000)
+                print(f"     Time range: {first_dt} to {last_dt}")
+                
+        return data
+    else:
+        print(f"❌ Failed to fetch telemetry data: HTTP {response.status_code}")
+        print(response.text)
+        return None
+
+def transform_and_export_csv(data):
+    """
+    Transform the JSON data into separate CSV files for each parameter.
+    Based on the curl response structure: {"ph":[{"ts":1762865390358,"value":"8.25"}], ...}
+    """
+    
+    if not data:
+        print("❌ No data to process")
+        return False
+
+    print(f"\n📁 Exporting data for parameters: {list(data.keys())}")
+    
+    exported_files = []
+    
+    for param_name, param_data in data.items():
+        print(f"\n🔧 Processing {param_name}: {len(param_data)} data points")
+        
+        if not param_data:
+            print(f"   ⚠️ No data available for {param_name}")
+            continue
+            
+        # Create DataFrame for this parameter
+        df = pd.DataFrame(param_data)
+        
+        # Convert timestamp from milliseconds to datetime
+        df['ts'] = pd.to_datetime(df['ts'], unit='ms')
+        
+        # Convert value to numeric (handles string values like "8.25")
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        
+        # Remove any rows with NaN values
+        df = df.dropna()
+        
+        if df.empty:
+            print(f"   ⚠️ No valid data after cleaning for {param_name}")
+            continue
+            
+        # Rename columns for CSV export
+        df = df.rename(columns={
+            'ts': 'timestamp',
+            'value': param_name
+        })
+        
+        # Create filename
+        filename = f"edenic_{param_name}.csv"
         
         try:
-            response = requests.get(API_URL, headers=headers, params=test_case['params'], timeout=30)
-            print(f"Status Code: {response.status_code}")
-            print(f"Response Headers: {dict(response.headers)}")
+            # Export to CSV
+            df.to_csv(filename, index=False)
+            print(f"   ✅ Exported {filename} with {len(df)} records")
             
-            if response.status_code == 200:
-                data = response.json()
-                print(f"Response keys: {list(data.keys())}")
-                print(f"Response length: {len(str(data))} characters")
-                
-                if data:
-                    print("Sample of response content:")
-                    print(json.dumps(data, indent=2)[:500] + "..." if len(str(data)) > 500 else json.dumps(data, indent=2))
-                else:
-                    print("Response is empty")
-            else:
-                print(f"Error: {response.text}")
-                
+            # Show sample data
+            print(f"   📊 Sample data:")
+            print(f"      Timestamp: {df['timestamp'].iloc[0]}")
+            print(f"      {param_name}: {df[param_name].iloc[0]}")
+            
+            exported_files.append(filename)
+            
         except Exception as e:
-            print(f"Request failed: {e}")
+            print(f"   ❌ Error exporting {filename}: {e}")
+    
+    if exported_files:
+        print(f"\n🎉 Successfully exported {len(exported_files)} files:")
+        for file in exported_files:
+            print(f"   📄 {file}")
+        return True
+    else:
+        print("\n❌ No files were exported")
+        return False
 
-def fetch_telemetry_with_fallback():
-    """Try multiple approaches to get data"""
-    start_ts, end_ts = get_timestamps_past_7_days()
-    
-    # Try different parameter combinations
-    attempts = [
-        # Original attempt
-        {
-            "keys": "temperature,electrical_conductivity,ph",
-            "startTs": str(start_ts),
-            "endTs": str(end_ts),
-            "interval": "10800000",
-            "agg": "AVG",
-            "orderBy": "ASC"
-        },
-        # Try without interval
-        {
-            "keys": "temperature",
-            "startTs": str(start_ts),
-            "endTs": str(end_ts),
-            "agg": "AVG",
-            "orderBy": "ASC"
-        },
-        # Try raw data without aggregation
-        {
-            "keys": "temperature",
-            "startTs": str(start_ts),
-            "endTs": str(end_ts),
-            "orderBy": "ASC"
-        }
-    ]
-    
-    for i, params in enumerate(attempts):
-        print(f"\nAttempt {i+1} with params: {params}")
-        response = requests.get(API_URL, headers=headers, params=params)
+def create_combined_csv(data):
+    """Create a combined CSV with all parameters in one file"""
+    if not data:
+        return
         
-        if response.status_code == 200:
-            data = response.json()
-            if data and len(data) > 0:
-                print(f"✅ Success with attempt {i+1}")
-                return data
-            else:
-                print(f"❌ Attempt {i+1}: Empty response")
-        else:
-            print(f"❌ Attempt {i+1}: HTTP {response.status_code}")
+    # Find the longest data series to use as base
+    longest_param = max(data.keys(), key=lambda x: len(data[x]))
+    base_df = pd.DataFrame(data[longest_param])
+    base_df['timestamp'] = pd.to_datetime(base_df['ts'], unit='ms')
     
-    return None
+    # Create combined DataFrame
+    combined_data = []
+    
+    # Get all unique timestamps
+    all_timestamps = set()
+    for param_data in data.values():
+        for point in param_data:
+            all_timestamps.add(point['ts'])
+    
+    # Sort timestamps
+    sorted_timestamps = sorted(all_timestamps)
+    
+    # Build combined data
+    for ts in sorted_timestamps:
+        row = {'timestamp': pd.to_datetime(ts, unit='ms')}
+        for param_name, param_data in data.items():
+            # Find value for this timestamp
+            value = None
+            for point in param_data:
+                if point['ts'] == ts:
+                    value = point['value']
+                    break
+            row[param_name] = value
+        combined_data.append(row)
+    
+    combined_df = pd.DataFrame(combined_data)
+    
+    # Export combined CSV
+    combined_df.to_csv('edenic_combined.csv', index=False)
+    print(f"📊 Exported combined CSV with {len(combined_df)} records")
+    return combined_df
 
 if __name__ == "__main__":
-    print("Starting API debugging...")
+    print("🚀 Starting Edenic Telemetry Export")
+    print("=" * 50)
     
-    # First, run debug to understand the API behavior
-    debug_api_call()
-    
-    # Then try to fetch data with fallback approaches
-    print(f"\n{'#'*60}")
-    print("ATTEMPTING TO FETCH DATA WITH FALLBACKS")
-    print(f"{'#'*60}")
-    
-    data = fetch_telemetry_with_fallback()
-    
+    data = fetch_telemetry()
     if data:
-        print(f"✅ Successfully fetched data with keys: {list(data.keys())}")
-        # Here you would call your transform function
+        success = transform_and_export_csv(data)
+        
+        # Also create a combined CSV
+        combined_df = create_combined_csv(data)
+        
+        if success:
+            print(f"\n✅ Script completed successfully!")
+        else:
+            print(f"\n⚠️ Script completed but no data was exported")
     else:
-        print("❌ All attempts failed to fetch data")
-        print("\nPossible issues:")
-        print("1. No data exists for the specified time range")
-        print("2. The parameter names are incorrect")
-        print("3. The API endpoint requires different parameters")
-        print("4. The device might not be sending data")
-        print("5. Check if you need to specify a device ID or other identifier")
+        print(f"\n❌ Failed to fetch data from API")
