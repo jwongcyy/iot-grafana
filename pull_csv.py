@@ -2,6 +2,7 @@ import os
 import requests
 import time
 import pandas as pd
+import json
 
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
@@ -37,6 +38,7 @@ def fetch_telemetry():
     if response.status_code == 200:
         print("Response received from Edenic API")
         data = response.json()
+        print(f"API Response keys: {list(data.keys())}")
         return data
     else:
         print(f"Failed to fetch telemetry data: HTTP {response.status_code}")
@@ -45,55 +47,91 @@ def fetch_telemetry():
 
 def transform_and_export_csv(data):
     """
-    Transform the JSON data into a DataFrame and export separate CSV files for
-    temperature, pH, and electrical conductivity.
-    Assumes data["results"] is a list of telemetry records with keys including
-    'timestamp', 'temperature', 'ph', 'electrical_conductivity'.
+    Transform the JSON data into separate CSV files for each parameter.
+    Based on the original code structure where data is organized by parameter names.
     """
-
-    if not data or 'results' not in data or not data['results']:
+    
+    if not data:
         print("No data to process")
         return
 
-    # Create DataFrame from results
-    df = pd.DataFrame(data['results'])
+    print(f"Available parameters in response: {list(data.keys())}")
+    
+    exported_files = []
+    
+    for param_name, param_data in data.items():
+        print(f"Processing {param_name}: {len(param_data) if param_data else 0} data points")
+        
+        if not param_data:
+            print(f"No data available for {param_name}")
+            continue
+            
+        # Create DataFrame for this parameter
+        df = pd.DataFrame(param_data)
+        print(f"DataFrame columns for {param_name}: {df.columns.tolist()}")
+        
+        if df.empty:
+            print(f"Empty DataFrame for {param_name}")
+            continue
+            
+        # Convert timestamp and value
+        df['ts'] = pd.to_datetime(df['ts'], unit='ms')
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        
+        # Rename columns to match expected format
+        df = df.rename(columns={
+            'ts': '',
+            'value': param_name
+        })
+        
+        # Create filename based on parameter
+        filename = f"edenic_{param_name}.csv"
+        
+        try:
+            # Export to CSV
+            df.to_csv(filename, index=False)
+            print(f"✅ Exported {filename} with {len(df)} records")
+            exported_files.append(filename)
+            
+            # Show sample
+            print(f"Sample of {filename}:")
+            print(df.head(2))
+            print("-" * 50)
+            
+        except Exception as e:
+            print(f"❌ Error exporting {filename}: {e}")
+    
+    if exported_files:
+        print(f"✅ Successfully exported {len(exported_files)} files")
+    else:
+        print("❌ No files were exported - check data structure")
 
-    # Convert timestamp from milliseconds epoch to human-readable or keep timestamp as string
-    # Example: convert ms to ISO date string (optional, or keep as-is)
-    # df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-
-    # Rename columns to match your CSV format, including a blank first column for timestamp
-    # Here we'll make the first column empty string to match your provided example
-    df.rename(columns={
-        'timestamp': '',
-        'ph': 'pH',
-        'temperature': 'Temperature',
-        'electrical_conductivity': 'EC'
-    }, inplace=True)
-
-    # Reorder columns to have the unnamed time column first (empty string), then pH, Temperature, EC
-    # If any columns missing, ignore to avoid errors
-    cols_to_keep = [col for col in ['', 'pH', 'Temperature', 'EC'] if col in df.columns]
-    df = df[cols_to_keep]
-
-    # Save the modified full CSV (optional)
-    df.to_csv('export_mod.csv', index=False)
-
-    # Prepare dictionary for split-export filenames
-    split_files = {
-        'pH': 'edenic1_ph.csv',
-        'Temperature': 'edenic1_temp.csv',
-        'EC': 'edenic1_ec.csv'
-    }
-
-    # Export the three CSV files: each has timestamp and one measurement column
-    for col, filename in split_files.items():
-        if col in df.columns:
-            split_df = df[['', col]]
-            split_df.to_csv(filename, index=False)
-            print(f"Exported {filename}")
+def debug_api_response(data):
+    """Debug function to understand the API response structure"""
+    print("\n" + "="*60)
+    print("DEBUG API RESPONSE STRUCTURE")
+    print("="*60)
+    print(f"Top-level keys: {list(data.keys())}")
+    
+    for key, value in data.items():
+        print(f"\nParameter: {key}")
+        print(f"Type: {type(value)}")
+        if isinstance(value, list):
+            print(f"Number of items: {len(value)}")
+            if value:
+                print(f"First item: {value[0]}")
+                print(f"Keys in first item: {list(value[0].keys()) if isinstance(value[0], dict) else 'N/A'}")
+        else:
+            print(f"Value: {value}")
+    print("="*60 + "\n")
 
 if __name__ == "__main__":
     data = fetch_telemetry()
     if data:
+        # First, debug the response structure
+        debug_api_response(data)
+        
+        # Then try to export
         transform_and_export_csv(data)
+    else:
+        print("❌ No data received from API")
