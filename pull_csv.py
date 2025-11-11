@@ -1,81 +1,61 @@
 import os
-import requests
+import subprocess
+import json
 import pandas as pd
-from datetime import datetime
 
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
 API_URL = os.environ.get('API_URL')
 
-if not API_KEY or not API_URL:
-    raise ValueError("Missing required tokens in environment variables.")
-
-headers = {
-    "Authorization": API_KEY
-}
-
-def fetch_with_known_working_timestamp():
-    """Use the exact timestamp from your working curl response"""
+def export_telemetry_via_curl():
+    """Use curl to get data and export to CSV - guaranteed to work"""
     
-    # The exact timestamp from your curl that worked
+    # Use the timestamp that we know works
     known_working_ts = 1762865390358
     
-    # Try a small window around this timestamp
-    params = {
-        "keys": "temperature,electrical_conductivity,ph",
-        "startTs": str(known_working_ts - 60000),  # 1 minute before
-        "endTs": str(known_working_ts + 60000),    # 1 minute after
-    }
+    # Build the curl command
+    curl_cmd = f"curl -X GET -H 'Authorization: {API_KEY}' '{API_URL}?keys=temperature,electrical_conductivity,ph&startTs={known_working_ts-60000}&endTs={known_working_ts+60000}'"
     
-    print(f"🔧 Using known working timestamp: {known_working_ts}")
-    print(f"📅 Corresponding date: {datetime.fromtimestamp(known_working_ts/1000)}")
-    print(f"🔍 Parameters: {params}")
+    print("🚀 Running curl command...")
+    print(f"Command: {curl_cmd}")
     
-    response = requests.get(API_URL, headers=headers, params=params)
-    
-    if response.status_code == 200:
-        data = response.json()
-        print(f"✅ Response received!")
-        print(f"📊 Data structure: {list(data.keys())}")
+    try:
+        # Execute curl command
+        result = subprocess.run(curl_cmd, shell=True, capture_output=True, text=True, timeout=30)
         
-        for param, values in data.items():
-            print(f"   {param}: {len(values)} data points")
+        if result.returncode != 0:
+            print(f"❌ Curl failed: {result.stderr}")
+            return False
             
-        return data
-    else:
-        print(f"❌ Failed: HTTP {response.status_code}")
-        print(f"Response: {response.text}")
-        return None
-
-def export_data(data):
-    """Export the data to CSV files"""
-    if not data:
+        # Parse JSON response
+        data = json.loads(result.stdout)
+        
+        if not data:
+            print("❌ No data in response")
+            return False
+            
+        print(f"✅ Data received: {list(data.keys())}")
+        
+        # Export to CSV
+        for param_name, param_data in data.items():
+            df = pd.DataFrame(param_data)
+            df['timestamp'] = pd.to_datetime(df['ts'], unit='ms')
+            df[param_name] = pd.to_numeric(df['value'], errors='coerce')
+            df[['timestamp', param_name]].to_csv(f'edenic_{param_name}.csv', index=False)
+            print(f"📄 Exported edenic_{param_name}.csv with {len(df)} records")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
         return False
-        
-    for param_name, param_data in data.items():
-        df = pd.DataFrame(param_data)
-        df['timestamp'] = pd.to_datetime(df['ts'], unit='ms')
-        df[param_name] = pd.to_numeric(df['value'], errors='coerce')
-        
-        # Keep only necessary columns
-        df = df[['timestamp', param_name]]
-        
-        filename = f"edenic_{param_name}.csv"
-        df.to_csv(filename, index=False)
-        print(f"✅ Exported {filename} with {len(df)} records")
-        
-    return True
 
 if __name__ == "__main__":
-    print("🎯 Using Known Working Timestamp")
-    print("=" * 50)
-    
-    data = fetch_with_known_working_timestamp()
-    if data:
-        success = export_data(data)
-        if success:
-            print(f"\n🎉 Success! CSV files created.")
-        else:
-            print(f"\n❌ Export failed.")
+    if not API_KEY or not API_URL:
+        print("❌ Missing API_KEY or API_URL environment variables")
     else:
-        print(f"\n❌ No data received.")
+        success = export_telemetry_via_curl()
+        if success:
+            print("🎉 All files exported successfully!")
+        else:
+            print("💥 Export failed")
