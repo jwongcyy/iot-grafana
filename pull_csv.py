@@ -20,6 +20,13 @@ def get_timestamps_past_7_days():
     end_ts = int(time.time() * 1000)
     # Start timestamp = 7 days ago in milliseconds
     start_ts = end_ts - (7 * 24 * 60 * 60 * 1000)
+    
+    # Debug output to see the actual timestamps
+    print(f"Generated timestamps:")
+    print(f"  Start TS: {start_ts} ({datetime.fromtimestamp(start_ts/1000).strftime('%Y-%m-%d %H:%M:%S')})")
+    print(f"  End TS:   {end_ts} ({datetime.fromtimestamp(end_ts/1000).strftime('%Y-%m-%d %H:%M:%S')})")
+    print(f"  Query range: 7 days from {datetime.fromtimestamp(start_ts/1000).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end_ts/1000).strftime('%Y-%m-%d')}")
+    
     return start_ts, end_ts
 
 def fetch_telemetry():
