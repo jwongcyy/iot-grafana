@@ -20,8 +20,8 @@ jobs:
         
     - name: Run telemetry export
       env:
-        API_KEY: ${{ secrets.EDENIC_API_KEY }}
-        API_URL: ${{ secrets.EDENIC_API_URL }}
+        API_URL: ${{ secrets.API_URL }}
+        API_KEY: ${{ secrets.API_KEY }}
       run: |
         chmod +x telemetry.sh
         ./telemetry.sh
