@@ -31,7 +31,7 @@ jobs:
         API_URL: ${{ secrets.API_URL }}
         API_KEY: ${{ secrets.API_KEY }}
       run: |
-        python pull_csv.py
+        python diagnose.py
         
     - name: Commit processed files
       run: |
