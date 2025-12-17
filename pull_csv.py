@@ -33,24 +33,21 @@ def get_timestamps_past_7_days():
 def fetch_telemetry():
     start_ts, end_ts = get_timestamps_past_7_days()
     
-    params = {
-        "keys": "ph,temperature,electrical_conductivity",
-        "startTs": str(start_ts),
-        "endTs": str(end_ts),
-        "interval": "10800000",  # 3-hour interval
-        "agg": "AVG",
-        "orderBy": "ASC"
-    }
+    # Build query string with comma-separated keys
+    query_string = (
+        f"keys=ph,temperature,electrical_conductivity"
+        f"&startTs={start_ts}"
+        f"&endTs={end_ts}"
+        f"&interval=10800000"
+        f"&agg=AVG"
+        f"&orderBy=ASC"
+    )
     
-    response = requests.get(API_URL, headers=headers, params=params)
-    if response.status_code == 200:
-        print("Response received from Edenic API")
-        data = response.json()
-        print(f"API Response keys: {list(data.keys())}")
-        return data
-    else:
-        print(f"Failed to fetch telemetry data: HTTP {response.status_code}")
-        print(response.text)
+    try:
+        resp = requests.get(API_URL, headers=headers, params=query_string, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Failed to fetch telemetry data: {e}")
         return None
 
 def transform_and_export_csv(data):
