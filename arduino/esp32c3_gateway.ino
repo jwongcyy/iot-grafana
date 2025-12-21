@@ -1,5 +1,4 @@
-// ESP32 Arduino Core 2.0+
-// gateway_oled_display.ino
+
 #include <esp_now.h>
 #include <WiFi.h>
 #include <Wire.h>
@@ -23,7 +22,6 @@ typedef struct sensor_data {
   uint8_t node_id;
   float temperature;
   uint32_t sequence;
-  int8_t rssi;  // Will be filled by gateway
 } sensor_data;
 
 // ========== SENSOR TRACKING ==========
@@ -31,7 +29,7 @@ typedef struct sensor_data {
 struct SensorInfo {
   float temperature;
   int8_t rssi;
-  unsigned long lastSeen;  // Changed to unsigned long for millis()
+  uint32_t lastSeen;
   uint32_t packetCount;
   bool connected;
 } sensors[MAX_SENSORS];
@@ -54,29 +52,44 @@ unsigned long lastModeChange = 0;
 int8_t signalHistory[GRAPH_POINTS] = {0};
 int graphIndex = 0;
 
-// ========== TIME UTILITY FUNCTIONS ==========
-String getTimeAgo(unsigned long lastSeen) {
-  unsigned long diff = millis() - lastSeen;
+// ========== ESP-NOW CALLBACK (FIXED FOR ESP32 CORE 2.0+) ==========
+// This works with ESP32 Arduino Core 2.0 and later
+void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingData, int len) {
+  sensor_data data;
   
-  if (diff < 1000) {
-    return "Now";
-  } else if (diff < 60000) {
-    return String(diff / 1000) + "s";
-  } else if (diff < 3600000) {
-    return String(diff / 60000) + "m";
-  } else {
-    return String(diff / 3600000) + "h";
+  if(len == sizeof(sensor_data)) {
+    memcpy(&data, incomingData, sizeof(data));
+    
+    // Validate node ID
+    if(data.node_id >= 1 && data.node_id <= MAX_SENSORS) {
+      int idx = data.node_id - 1;
+      
+      // Update sensor data
+      sensors[idx].temperature = data.temperature;
+      sensors[idx].rssi = recv_info->rx_ctrl->rssi; // RSSI from received packet
+      sensors[idx].lastSeen = millis();
+      sensors[idx].packetCount++;
+      sensors[idx].connected = true;
+      
+      // Print to serial for debugging
+      Serial.print("Node ");
+      Serial.print(data.node_id);
+      Serial.print(" | Temp: ");
+      Serial.print(data.temperature, 1);
+      Serial.print("°C | RSSI: ");
+      Serial.print(sensors[idx].rssi);
+      Serial.print("dB | Seq: ");
+      Serial.println(data.sequence);
+      
+      // Auto-switch to dashboard when new data arrives
+      if(currentMode != DASHBOARD && millis() - lastModeChange > 10000) {
+        currentMode = DASHBOARD;
+      }
+      
+      // Update display
+      updateDisplay();
+    }
   }
-}
-
-String getFormattedTime(unsigned long lastSeen) {
-  unsigned long diff = millis() - lastSeen;
-  
-  if (diff < 1000) return "Just now";
-  if (diff < 60000) return String(diff / 1000) + " sec ago";
-  if (diff < 3600000) return String(diff / 60000) + " min ago";
-  if (diff < 86400000) return String(diff / 3600000) + " hour ago";
-  return String(diff / 86400000) + " day ago";
 }
 
 // ========== DISPLAY FUNCTIONS ==========
@@ -146,6 +159,18 @@ void drawSignalBars(int x, int y, int8_t rssi) {
   display.print("dB");
 }
 
+void drawBattery(int x, int y, int percent) {
+  // Battery outline
+  display.drawRect(x, y, 20, 10, SSD1306_WHITE);
+  display.fillRect(x + 20, y + 2, 3, 6, SSD1306_WHITE);
+  
+  // Fill based on percentage
+  int fillWidth = map(percent, 0, 100, 0, 18);
+  if (fillWidth > 0) {
+    display.fillRect(x + 1, y + 1, fillWidth, 8, SSD1306_WHITE);
+  }
+}
+
 void updateSensorStats() {
   connectedSensors = 0;
   totalPackets = 0;
@@ -172,35 +197,14 @@ void updateSensorStats() {
 void showDashboard() {
   display.clearDisplay();
   
-  // Header with timestamp
+  // Header
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("G");
-  
-  // Current time (uptime)
-  unsigned long uptime = millis() / 1000;
-  int hours = uptime / 3600;
-  int minutes = (uptime % 3600) / 60;
-  int seconds = uptime % 60;
-  
-  display.setCursor(15, 0);
-  if (hours > 0) {
-    display.print("UP:");
-    display.print(hours);
-    display.print("h");
-    display.print(minutes);
-    display.print("m");
-  } else {
-    display.print("UP:");
-    display.print(minutes);
-    display.print("m");
-    display.print(seconds);
-    display.print("s");
-  }
+  display.print("GATEWAY");
   
   // Connected sensors count
-  display.setCursor(80, 0);
-  display.print("Sens:");
+  display.setCursor(65, 0);
+  display.print("Active:");
   display.print(connectedSensors);
   display.print("/");
   display.print(MAX_SENSORS);
@@ -212,11 +216,9 @@ void showDashboard() {
     // Find strongest signal sensor
     int bestNode = -1;
     int8_t bestRSSI = -100;
-    unsigned long mostRecent = 0;
     
     for (int i = 0; i < MAX_SENSORS; i++) {
-      if (sensors[i].connected && sensors[i].lastSeen > mostRecent) {
-        mostRecent = sensors[i].lastSeen;
+      if (sensors[i].connected && sensors[i].rssi > bestRSSI) {
         bestRSSI = sensors[i].rssi;
         bestNode = i;
       }
@@ -231,45 +233,39 @@ void showDashboard() {
       
       // Node info
       display.setTextSize(1);
-      display.setCursor(10, 45);
+      display.setCursor(10, 55);
       display.print("Node ");
       display.print(bestNode + 1);
       
-      // Last seen timestamp
-      display.setCursor(70, 45);
-      display.print(getTimeAgo(sensors[bestNode].lastSeen));
-      display.print(" ago");
-      
       // Signal strength bars
-      drawSignalBars(50, 52, bestRSSI);
+      drawSignalBars(50, 62, bestRSSI);
     }
   } else {
     // No sensors connected
     display.setTextSize(2);
-    display.setCursor(10, 20);
+    display.setCursor(15, 20);
     display.print("No Sensor");
     
     display.setTextSize(1);
-    display.setCursor(30, 43);
+    display.setCursor(30, 53);
     display.print("Waiting...");
   }
   
-  // Footer
-  display.drawFastHLine(0, 52, 128, SSD1306_WHITE);
+  // // Footer
+  // display.drawFastHLine(0, 52, 128, SSD1306_WHITE);
   
-  // Current time
-  display.setTextSize(1);
-  display.setCursor(0, 55);
-  display.print("Now:");
+  // // Average signal
+  // display.setTextSize(1);
+  // display.setCursor(0, 58);
+  // display.print("Avg:");
+  // display.print(avgRSSI);
+  // display.print("dB");
   
-  unsigned long current = millis() / 1000;
-  int m = (current % 3600) / 60;
-  int s = current % 60;
-  if (m < 10) display.print("0");
-  display.print(m);
-  display.print(":");
-  if (s < 10) display.print("0");
-  display.print(s);
+  // // Uptime
+  // display.setCursor(70, 58);
+  // display.print("UP:");
+  // display.print(millis() / 60000);
+  // display.print("m");
   
   display.display();
 }
@@ -277,23 +273,11 @@ void showDashboard() {
 void showSensorList() {
   display.clearDisplay();
   
-  // Header with current time
+  // Header
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Sensors: ");
+  display.print("Connected: ");
   display.print(connectedSensors);
-  display.print("/");
-  display.print(MAX_SENSORS);
-  
-  // Current time
-  unsigned long current = millis() / 1000;
-  int m = (current % 3600) / 60;
-  int s = current % 60;
-  display.setCursor(90, 0);
-  display.print(m);
-  display.print(":");
-  if (s < 10) display.print("0");
-  display.print(s);
   
   // Divider
   display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
@@ -310,27 +294,31 @@ void showSensorList() {
       display.print(i + 1);
       
       // Temperature
-      display.setCursor(15, y);
+      display.setCursor(18, y);
       display.print(sensors[i].temperature, 1);
       display.print("C");
       
-      // Signal (compact)
+      // Signal bars (mini)
       int8_t rssi = sensors[i].rssi;
-      display.setCursor(45, y);
+      int bars = 0;
+      if (rssi >= -60) bars = 3;
+      else if (rssi >= -70) bars = 2;
+      else if (rssi >= -80) bars = 1;
+      
+      for (int b = 0; b < 3; b++) {
+        if (b < bars) {
+          display.fillRect(60 + b * 4, y + 3 - (b + 1), 3, (b + 1) * 2, SSD1306_WHITE);
+        }
+      }
+      
+      // RSSI value
+      display.setCursor(80, y);
       display.print(rssi);
       display.print("dB");
       
-      // Last seen time
-      display.setCursor(70, y);
-      String timeAgo = getTimeAgo(sensors[i].lastSeen);
-      display.print(timeAgo);
-      
-      // Online indicator (dot)
-      if (millis() - sensors[i].lastSeen < 30000) {  // 30 seconds = online
-        display.fillCircle(125, y + 2, 2, SSD1306_WHITE);
-      } else {
-        display.drawCircle(125, y + 2, 2, SSD1306_WHITE);
-      }
+      // Packet count
+      display.setCursor(110, y);
+      display.print(sensors[i].packetCount);
       
       y += 10;
       displayed++;
@@ -342,20 +330,6 @@ void showSensorList() {
     display.print("No active sensors");
   }
   
-  // Show inactive sensors count
-  int inactive = 0;
-  for (int i = 0; i < MAX_SENSORS; i++) {
-    if (sensors[i].connected && (millis() - sensors[i].lastSeen >= 300000)) {
-      inactive++;
-    }
-  }
-  
-  if (inactive > 0) {
-    display.setCursor(0, 58);
-    display.print(inactive);
-    display.print(" inactive");
-  }
-  
   display.display();
 }
 
@@ -365,17 +339,9 @@ void showSignalGraph() {
   // Header
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Signal History");
-  
-  // Current time
-  unsigned long current = millis() / 1000;
-  int m = (current % 3600) / 60;
-  int s = current % 60;
-  display.setCursor(100, 0);
-  display.print(m);
-  display.print(":");
-  if (s < 10) display.print("0");
-  display.print(s);
+  display.print("Signal Now:");
+  display.print(avgRSSI);
+  display.print("dB");
   
   // Divider
   display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
@@ -420,33 +386,16 @@ void showSignalGraph() {
   display.setCursor(90, 55);
   display.print("Good");
   
-  // Graph time range (32 * 2 seconds = 64 seconds)
-  display.setCursor(110, 55);
-  display.print("1m");
-  
   display.display();
 }
 
 void showStatistics() {
   display.clearDisplay();
   
-  // Header with timestamp
+  // Header
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Network Stats");
-  
-  // Current time
-  unsigned long uptime = millis() / 1000;
-  int hours = uptime / 3600;
-  int minutes = (uptime % 3600) / 60;
-  display.setCursor(90, 0);
-  display.print("UP:");
-  if (hours > 0) {
-    display.print(hours);
-    display.print("h");
-  }
-  display.print(minutes);
-  display.print("m");
+  display.print("Network Statistics");
   
   // Divider
   display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
@@ -455,7 +404,7 @@ void showStatistics() {
   
   // Connected sensors
   display.setCursor(0, y);
-  display.print("Active: ");
+  display.print("Sensors: ");
   display.print(connectedSensors);
   display.print("/");
   display.print(MAX_SENSORS);
@@ -474,46 +423,24 @@ void showStatistics() {
   display.print(totalPackets);
   y += 10;
   
-  // Packet rate (per minute)
+  // // Gateway MAC (short)
+  // display.setCursor(0, y);
+  // display.print("MAC: ");
+  // display.print(gatewayMAC.substring(12));
+  // y += 10;
+  
+  // Uptime
   display.setCursor(0, y);
-  display.print("Rate: ");
-  
-  // Calculate packets per minute
-  static unsigned long lastMinutePackets = 0;
-  static unsigned long lastMinuteTime = 0;
-  static float packetsPerMinute = 0;
-  
-  if (millis() - lastMinuteTime > 60000) {
-    packetsPerMinute = (totalPackets - lastMinutePackets) * 60000.0 / (millis() - lastMinuteTime);
-    lastMinutePackets = totalPackets;
-    lastMinuteTime = millis();
-  }
-  
-  display.print(packetsPerMinute, 1);
-  display.print("/min");
+  display.print("Uptime: ");
+  display.print(millis() / 60000);
+  display.print("m");
   y += 10;
   
-  // Oldest sensor time
-  unsigned long oldest = 0;
-  for (int i = 0; i < MAX_SENSORS; i++) {
-    if (sensors[i].connected && sensors[i].lastSeen > oldest) {
-      oldest = sensors[i].lastSeen;
-    }
-  }
-  
-  if (oldest > 0) {
-    display.setCursor(0, y);
-    display.print("Last Rx: ");
-    display.print(getTimeAgo(oldest));
-    display.print(" ago");
-    y += 10;
-  }
-  
-  // Memory usage
+  // Free memory
   display.setCursor(0, y);
   display.print("RAM: ");
   display.print(ESP.getFreeHeap() / 1024);
-  display.print("KB free");
+  display.print("KB");
   
   display.display();
 }
@@ -537,46 +464,6 @@ void updateDisplay() {
   }
 }
 
-// ========== ESP-NOW CALLBACK ==========
-void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingData, int len) {
-  sensor_data data;
-  
-  if(len == sizeof(sensor_data)) {
-    memcpy(&data, incomingData, sizeof(data));
-    
-    // Validate node ID
-    if(data.node_id >= 1 && data.node_id <= MAX_SENSORS) {
-      int idx = data.node_id - 1;
-      
-      // Update sensor data
-      sensors[idx].temperature = data.temperature;
-      sensors[idx].rssi = WiFi.RSSI(); // Current RSSI from this packet
-      sensors[idx].lastSeen = millis();
-      sensors[idx].packetCount++;
-      sensors[idx].connected = true;
-      
-      // Print to serial with timestamp
-      unsigned long uptime = millis() / 1000;
-      int hours = uptime / 3600;
-      int minutes = (uptime % 3600) / 60;
-      int seconds = uptime % 60;
-      
-      Serial.printf("[%02d:%02d:%02d] ", hours, minutes, seconds);
-      Serial.print("Node ");
-      Serial.print(data.node_id);
-      Serial.print(" | Temp: ");
-      Serial.print(data.temperature, 1);
-      Serial.print("°C | RSSI: ");
-      Serial.print(sensors[idx].rssi);
-      Serial.print("dB | Seq: ");
-      Serial.println(data.sequence);
-      
-      // Update display
-      updateDisplay();
-    }
-  }
-}
-
 // ========== SETUP ==========
 void setup() {
   Serial.begin(115200);
@@ -595,13 +482,16 @@ void setup() {
   
   Serial.print("Gateway MAC: ");
   Serial.println(gatewayMAC);
+  Serial.print("WiFi Channel: ");
+  Serial.println(WiFi.channel());
   
   // Show splash screen
   showSplashScreen();
   
   // Initialize ESP-NOW
+  Serial.print("Initializing ESP-NOW... ");
   if(esp_now_init() != ESP_OK) {
-    Serial.println("ESP-NOW initialization failed!");
+    Serial.println("FAILED!");
     display.clearDisplay();
     display.setCursor(0, 0);
     display.print("ESP-NOW FAILED");
@@ -609,7 +499,9 @@ void setup() {
     delay(3000);
     ESP.restart();
   }
+  Serial.println("SUCCESS");
   
+  // Register receive callback (FIXED SIGNATURE)
   esp_now_register_recv_cb(OnDataRecv);
   
   Serial.println("Gateway initialized successfully!");
@@ -640,8 +532,8 @@ void loop() {
     }
   }
   
-  // Auto-cycle display modes every 15 seconds
-  if(millis() - lastModeChange > 15000) {
+  // Auto-cycle display modes every 10 seconds
+  if(millis() - lastModeChange > 10000) {
     currentMode = (DisplayMode)((currentMode + 1) % 4);
     lastModeChange = millis();
     updateDisplay();
