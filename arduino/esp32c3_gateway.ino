@@ -1,4 +1,3 @@
-// espnow_gateway_oled_advanced.ino
 // Shows connected sensors, signal strength, battery, and network status
 
 #include <esp_now.h>
