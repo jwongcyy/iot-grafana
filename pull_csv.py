@@ -4,6 +4,8 @@ import time
 import pandas as pd
 import json
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
