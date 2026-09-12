@@ -19,6 +19,11 @@ headers = {
 }
 print(f"API_KEY length: {len(API_KEY)}, repr of first/last 3 chars: {API_KEY[:3]!r}...{API_KEY[-3:]!r}")
 
+# --- temporary debug ---
+import hashlib
+print(f"API_KEY sha256: {hashlib.sha256(API_KEY.encode()).hexdigest()}")
+# --- end temporary debug ---
+
 def get_timestamps_past_7_days():
     # Current time (end timestamp) in milliseconds
     end_ts = int(time.time() * 1000)
