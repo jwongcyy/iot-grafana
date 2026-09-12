@@ -17,6 +17,8 @@ if not API_KEY or not API_URL:
 headers = {
     "Authorization": API_KEY
 }
+print(f"API_KEY length: {len(API_KEY)}, repr of first/last 3 chars: {API_KEY[:3]!r}...{API_KEY[-3:]!r}")
+print(f"API_URL: {API_URL!r}")
 
 def get_timestamps_past_7_days():
     # Current time (end timestamp) in milliseconds
