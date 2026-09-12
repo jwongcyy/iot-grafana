@@ -10,7 +10,7 @@ load_dotenv()
 # read secrets from environment
 API_KEY = os.environ.get('API_KEY')
 ORG_ID = os.environ.get('ORG_ID')
-API_URL = https://api.edenic.io/api/v1/telemetry/3ce4e580-8f8d-11f0-97a6-b92fd0a6fe82
+API_URL = os.environ.get('API_URL')
 
 if not API_KEY or not API_URL:
     raise ValueError("Missing required tokens in environment variables.")
