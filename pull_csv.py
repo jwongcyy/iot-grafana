@@ -11,7 +11,7 @@ load_dotenv()
 API_KEY = os.environ.get('API_KEY')
 ORG_ID = os.environ.get('ORG_ID')
 
-if not API_KEY or not API_URL:
+if not API_KEY or not ORG_ID:
     raise ValueError("Missing required tokens in environment variables.")
 
 headers = {
