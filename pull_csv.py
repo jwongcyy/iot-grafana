@@ -49,6 +49,9 @@ def fetch_telemetry():
     
     try:
         resp = requests.get(API_URL, headers=headers, params=query_string, timeout=30)
+        print(f"Status: {resp.status_code}")
+        print(f"Response headers: {dict(resp.headers)}")
+        print(f"Response body: {resp.text[:1000]}")
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
