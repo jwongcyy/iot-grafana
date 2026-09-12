@@ -18,7 +18,6 @@ headers = {
     "Authorization": API_KEY
 }
 print(f"API_KEY length: {len(API_KEY)}, repr of first/last 3 chars: {API_KEY[:3]!r}...{API_KEY[-3:]!r}")
-print(f"API_URL: {API_URL!r}")
 
 def get_timestamps_past_7_days():
     # Current time (end timestamp) in milliseconds
@@ -48,7 +47,7 @@ def fetch_telemetry():
     )
     
     try:
-        resp = requests.get(API_URL, headers=headers, params=query_string, timeout=30)
+        resp = requests.get(https://api.edenic.io/api/v1/telemetry/API_URL, headers=headers, params=query_string, timeout=30)
         print(f"Status: {resp.status_code}")
         print(f"Response headers: {dict(resp.headers)}")
         print(f"Response body: {resp.text[:1000]}")
